@@ -1,0 +1,16 @@
+ConceptNet db file
+http://conceptnet.media.mit.edu/dist/ConceptNet-sqlite.tar.gz
+- Download the sqlite db file and extract to conceptnet_db folder
+(here is the original installation instructions for python: http://xnet.media.mit.edu/docs/conceptnet/install.html)
+
+Sqlite JDBC
+http://www.zentus.com/sqlitejdbc/
+- add .jar file to java's build path
+
+
+Stanford's Lexical parser
+http://nlp.stanford.edu/software/lex-parser.shtml
+- Add stanford-parser.jar file to java's build path
+- Add englishPCFG.ser.gz lexicalizedparser to the folder parser
+
+
