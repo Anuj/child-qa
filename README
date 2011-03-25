@@ -14,3 +14,6 @@ http://nlp.stanford.edu/software/lex-parser.shtml
 - Add englishPCFG.ser.gz lexicalizedparser to the folder parser
 
 
+HTML parser
+http://htmlparser.sourceforge.net/
+  - add filterbuilder.jar and htmlparser.jar to java's build path
