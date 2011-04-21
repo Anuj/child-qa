@@ -8,14 +8,14 @@ import qa.util.*;
 
 public class Line {
 	
-	String[] spokenLine;
+	public String[] spokenLine;
 	ArrayList<String> spokenLine2;
 	ArrayList<String> grammarLine;
 	ArrayList<String> grammaticalLine;
 	public String spokenLineStr;
 	public String participant;
 	public HashMap<String, String> otherLines;
-	Counter<String> features;
+	public Counter<String> features;
 	public int ID = 0;
 	public int transcriptId;
 	
@@ -38,6 +38,10 @@ public class Line {
 		
 		participant = spokenLine[0].substring(1, spokenLine[0].indexOf('\t')-1);
 		spokenLine[0] = spokenLine[0].substring(spokenLine[0].indexOf('\t')+1);
+		
+		// NEW CODE REPLACE TRANSLATIONS SUCH AS dis [: this]
+		spokenLine = makeGrammatical(spokenLine);
+		
 		otherLines = new HashMap<String, String>();
 		for (int i = 1; i < lines.size(); ++i) {
 			String otherLine = lines.get(i);
@@ -60,8 +64,38 @@ public class Line {
 			}
 		}
 		spokenLine2 = strArrayToArrayList(spokenLine);
+		features = new Counter<String>();
 	}
 	
+	/**
+	 * correct translations such as dis [: this]
+	 * 
+	 * return String[]
+	 */
+	public String[] makeGrammatical(String[] spokenLine) {
+		ArrayList<String> newSpokenLine = new ArrayList<String>();
+		for (int i = 0; i < spokenLine.length; ++i) {
+			if (spokenLine[i].equals("[:")) {
+				newSpokenLine.remove(newSpokenLine.size()-1);
+				newSpokenLine.add(spokenLine[++i].substring(0, spokenLine[i].length()-1));
+			} else if (spokenLine[i].equals("(.)")) {
+				int x; 
+				x = 1;
+			} else if (spokenLine[i].indexOf('(') != -1) { // in the case of an(d)
+				int paren1 = spokenLine[i].indexOf('(');
+				int paren2 = spokenLine[i].indexOf(')');
+				String s = spokenLine[i].substring(0,paren1) + spokenLine[i].substring(paren1+1, paren2);
+				if (paren2 != spokenLine[i].length()-1) 
+					s += spokenLine[i].substring(paren2+1);
+				newSpokenLine.add(s);
+			} else {
+				newSpokenLine.add(spokenLine[i]);
+			}
+		}
+		String[] newSpokenLine2 = new String[newSpokenLine.size()];
+		newSpokenLine.toArray(newSpokenLine2);
+		return newSpokenLine2;
+	}
 	/** 
 	 * parses a mor line according to the CHAT transcription protocol 
 	 *  
@@ -93,6 +127,12 @@ public class Line {
 		}
 	}
 	
+	public boolean containsKeywordSpoken(String keyword) {
+		for (String s : spokenLine2)
+			if (s.equals(keyword))
+				return true;
+		return false;
+	}
 	/**
 	 * determines whether the Line has the specified keyword
 	 * Note: if pos is of the form pos:, include all pos:*
@@ -128,9 +168,14 @@ public class Line {
 			word = keyword;
 		}
 		
-		for (int i = 0; i < grammaticalLine.size(); ++i) {
+		ArrayList<String> l = null;
+		if (containsPOS)
+			l = grammaticalLine;
+		else 
+			l = spokenLine2;
+		for (int i = 0; i < l.size(); ++i) {
 			if (containsWord) { // if need to check word
-				if (grammaticalLine.get(i).equals(word)) { // check if the word is there
+				if (l.get(i).equals(word)) { // check if the word is there
 					if (containsPOS) { // if ALSO need to check pos 
 						String linePOS = grammarLine.get(i);
 						if (includeAllPOSSubtypes) {	// if pos includes all subtypes
@@ -177,8 +222,10 @@ public class Line {
 		//ArrayList<String> line;
 		String keywordWord = "";
 		String keywordPOS = "";
-		String lineWord = grammaticalLine.get(index);
-		String linePOS = grammarLine.get(index);
+		// THIS WILL BREAK SOMETHING
+		String lineWord = spokenLine2.get(index);
+		//String lineWord = grammaticalLine.get(index);
+		String linePOS = "";//grammarLine.get(index);
 		boolean checkPOSAll = false;
 		boolean checkPOS = false;
 		boolean checkWord = false;
@@ -260,6 +307,64 @@ public class Line {
 		
 	}
 	
+	public boolean containsKeywordSpoken(String keyword, int index) {
+		
+		//ArrayList<String> line;
+		String keywordWord = "";
+		String keywordPOS = "";
+		String lineWord = spokenLine2.get(index);
+		
+		return lineWord.equals(keyword);	
+	
+		
+		/*String word;
+		String pos = "";
+		boolean containsPOS = false;
+		
+		int pipeIdx = keyword.indexOf('|');
+		
+		//if (grammaticalLine != null)
+		//	line = grammaticalLine;
+		//else
+		//	line = spokenLine2;
+		
+		// if keyword is of the form: pos|word
+		if (pipeIdx != -1) {
+			pos = keyword.substring(0,pipeIdx);
+			word= keyword.substring(pipeIdx+1);
+			if (pos.equals(""))
+				return grammaticalLine.get(index).equals(word);
+			
+			boolean hasPOS = false;
+			boolean allPOS = false;
+			int colon = pos.indexOf(':');
+			if (colon == pos.length()-1) {
+				allPOS = true;
+				pos = pos.substring(0,pos.length()-1);
+			}
+			String linePOS = grammarLine.get(index);
+			if (allPOS) {
+				int lineColon = linePOS.indexOf(':');
+				if (lineColon != -1) {
+					linePOS = linePOS.substring(0,lineColon);
+				}
+				hasPOS = pos.equals(linePOS);
+			}
+			
+			if (word.equals(""))
+				return hasPOS;
+			return hasPOS && grammaticalLine.get(index).equals(word);
+		//	if (grammarLine == null)
+		//		return false; // this should really be an exception.... 
+		//	pos = keyword.substring(0,pipeIdx);
+		//	word= keyword.substring(pipeIdx+1);
+		//	containsPOS = true;
+		} else { // else keyword is of the form: word
+			return grammaticalLine.get(index).equals(keyword);
+		}*/
+		
+	}
+
 	/** 
 	 * Determine whether the Line has any of the listed keywords
 	 * 
@@ -295,6 +400,7 @@ public class Line {
 			line = grammaticalLine;
 		else
 			line = spokenLine2;
+		//line = spokenLine2;
 		
 		for (int i = 0; i < line.size(); ++i) {
 			if (containsKeyword(pattern.get(j), i)) {//line.get(i).equals(pattern.get(j))) {
@@ -327,9 +433,17 @@ public class Line {
 		return false;
 	}
 	
+	// use spokenLine2 if there is no grammar part in the pattern
 	// useGrammaticaLine by default
 	public boolean containsPattern(ArrayList<String> pattern) {
-		return containsPattern(pattern, true);
+		for (String s : pattern)
+			if (s.indexOf('|') != -1)
+				return containsPattern(pattern, true);
+		return containsPattern(pattern, false);
+	}
+	
+	public boolean containsPatternSpoken(ArrayList<String> pattern) {
+		return containsPattern(pattern, false);
 	}
 	
 	public boolean containsPOS(String pos) {
@@ -388,6 +502,8 @@ public class Line {
 		if (line.size() == 3)
 			features.incrementCount("three", 1.0);
 		
+		
+		
 		features.normalize();
 		return features;
 	}
@@ -431,6 +547,43 @@ public class Line {
 				posIndices.add(i);
 		}
 		return posIndices;
+	}
+	
+	public boolean equals(Object other) {
+		Line otherLine = (Line)other;
+		return spokenLine.equals(otherLine.spokenLine);
+	}
+	
+	public int hashCode() {
+		return spokenLine.hashCode();
+	}
+
+	
+	// using spokenLine
+	public ArrayList<ArrayList<String>> getNGrams(int n) {
+		ArrayList<ArrayList<String>> nGrams = new ArrayList<ArrayList<String>>();
+		for (int i = 0; i < spokenLine.length-n; ++i) {
+			ArrayList<String> tmp = new ArrayList<String>(n);
+			for (int j = i; j < i+n; ++j) {
+				tmp.add(spokenLine[j]);
+			}
+			nGrams.add(tmp);
+		}
+		return nGrams;
+	}
+	
+	
+	public void incrementFeaturesWithNgrams(Counter<ArrayList<String>> weights, int n) {
+		ArrayList<String> line = spokenLine2;
+		
+		for (ArrayList<String> nGram : getNGrams(n))
+			if (weights.containsKey(nGram))
+				features.incrementCount(nGram.toString(), weights.getCount(nGram));
+	}
+	
+	
+	public void normalizeFeatures() {
+		features.normalize();
 	}
 	
 }

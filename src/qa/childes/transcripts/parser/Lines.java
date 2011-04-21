@@ -11,13 +11,18 @@ public class Lines {
 
 	
 	public ArrayList<Line> allLines;
+	// filtered line indices are not in order
 	public ArrayList<Integer> filteredLinesIdx;
 	public ArrayList<Transcript> transcripts;
+	public HashMap<Integer, Integer> allLinesIDtoLineIDMap;
+	public HashMap<Integer, Integer> lineIDtoAllLinesIDMap;
 	
 	public Lines() {
 		allLines = new ArrayList<Line>();
 		filteredLinesIdx = new ArrayList<Integer>();
 		transcripts = new ArrayList<Transcript>();
+		allLinesIDtoLineIDMap = new HashMap<Integer, Integer>();
+		lineIDtoAllLinesIDMap = new HashMap<Integer, Integer>();
 	}
 	
 	public Lines(ArrayList<Directory> directories) {
@@ -30,6 +35,8 @@ public class Lines {
 		allLines = new ArrayList<Line>(nLine);
 		filteredLinesIdx = new ArrayList<Integer>(nLine);
 		transcripts = new ArrayList<Transcript>();
+		allLinesIDtoLineIDMap = new HashMap<Integer, Integer>();
+		lineIDtoAllLinesIDMap = new HashMap<Integer, Integer>();
 		
 		for (int i = 0; i < nLine; ++i) filteredLinesIdx.add(i);
 		
@@ -41,19 +48,26 @@ public class Lines {
 				++transcriptI;
 			}
 		}
+		allLinesIDtoLineIDMap = getAllLinesIDtoLineIDMap();
+		lineIDtoAllLinesIDMap = getLineIDtoAllLinesIDMap();
 	}
 	
 	public Lines(ArrayList<Line> lines, ArrayList<Transcript> transcripts) {
 		filteredLinesIdx = new ArrayList<Integer>(lines.size());
 		for (int i = 0; i < lines.size(); ++i) filteredLinesIdx.add(i);
 		allLines = lines;
+		allLinesIDtoLineIDMap = getAllLinesIDtoLineIDMap(); // these should be passed in....
+		lineIDtoAllLinesIDMap = getLineIDtoAllLinesIDMap();
 		this.transcripts = transcripts;
 	}
 	
+	// to create a shallow copy
 	public Lines(ArrayList<Line> lines, ArrayList<Transcript> transcripts, ArrayList<Integer> filteredLinesIdx) {
 		this.filteredLinesIdx = filteredLinesIdx;
 		allLines = lines;
 		this.transcripts = transcripts;
+		allLinesIDtoLineIDMap = getAllLinesIDtoLineIDMap(); // these should be passed in
+		lineIDtoAllLinesIDMap = getLineIDtoAllLinesIDMap();
 	}
 	
 	public Lines(String fileName) {
@@ -113,10 +127,15 @@ public class Lines {
 		      ex.printStackTrace();
 		    }
 		    allLines.trimToSize();
+		    allLinesIDtoLineIDMap = getAllLinesIDtoLineIDMap();
+			lineIDtoAllLinesIDMap = getLineIDtoAllLinesIDMap();
 	}
 
 	public Lines copy() {
-		return new Lines(this.allLines, this.transcripts, this.filteredLinesIdx);
+		ArrayList<Integer> filteredLinesIdxCopy = new ArrayList<Integer>();
+		for (int i : filteredLinesIdx) 
+			filteredLinesIdxCopy.add(i);
+		return new Lines(this.allLines, this.transcripts, filteredLinesIdxCopy);
 	}
 	
 	public void addLines(Directory d) {
@@ -132,11 +151,25 @@ public class Lines {
 			for (int i = oldFilteredLinesSize; i < oldFilteredLinesSize  + t.allLines.size(); ++i)
 				filteredLinesIdx.add(i);
 		}
+		allLinesIDtoLineIDMap = getAllLinesIDtoLineIDMap();
+		lineIDtoAllLinesIDMap = getLineIDtoAllLinesIDMap();
 	}
 	
 	public void addLine(Line l) {
 		allLines.add(l);
+		allLinesIDtoLineIDMap.put(allLines.size()-1, l.ID);
+		lineIDtoAllLinesIDMap.put(l.ID, allLines.size()-1);
 	}
+	
+	// filtered line indices are not in order
+	public void addFilteredLineIdx(int i) {
+		filteredLinesIdx.add(i);
+	}
+	
+	public int getFilteredLineIdx(int filteredLineIdxIdx) {
+		return filteredLinesIdx.get(filteredLineIdxIdx);
+	}
+	
 	
 	public void synchronizeTranscriptIDs() {
 		HashMap<Integer, Integer> transcriptIDMap= new HashMap<Integer, Integer>();
@@ -154,7 +187,7 @@ public class Lines {
 			
 	}
 	
-	public Line getLine(int idx) {
+	public Line getFilteredLine(int idx) {
 		return allLines.get(filteredLinesIdx.get(idx));
 	}
 	
@@ -162,101 +195,158 @@ public class Lines {
 		return allLines.get(idx);
 	}
 	/* METHODS FOR K MEANS CLUSTERING */
-	public Line getCentroid() {
-		Line maxLine = null;
+	public int getCentroid() {
+		// the first line in Lines is the centroid
+		//Line maxLine = null;
+		int maxLineFilteredIdx = -1;
 		int maxSimCount = -1;
-		for (Line lineCand : allLines) {
+		//for (Line lineCand : getFilteredLinesArr()) {
+		for (int i = 0; i < filteredLinesIdx.size(); ++i) {
+			int currFilteredIdx = filteredLinesIdx.get(i);
+			Line lineCand = getFilteredLine(i);//getFilteredLine(currFilteredIdx);
 			int tmpSimCount = 0; 
-			for (Line otherLine : allLines) {
+			for (Line otherLine : getFilteredLinesArr()) {
+			//for (int i = 0; i < allLines.size()-1; ++i) {
+				//Line otherLine = allLines.get(i);
 				tmpSimCount += lineCand.getSimilarity(otherLine);
+			//}
 			}
 			tmpSimCount -= lineCand.getSimilarity(lineCand);
 			if (tmpSimCount > maxSimCount) {
 				maxSimCount = tmpSimCount;
-				maxLine = lineCand;
+				//maxLine = lineCand;
+				maxLineFilteredIdx = currFilteredIdx;
 			}
 		}
-		return maxLine;
+		return maxLineFilteredIdx;
 	}
 
 	// return the index of the most similar line
 	public int getMaxSimLineIdx(Line l) {
 		int maxIdx = -1;
 		double maxSim = -1;
-		for (int i = 0; i < allLines.size(); ++i) {
-			double tmpSim = l.getSimilarity(allLines.get(i));
-			if (tmpSim > maxSim) {
-				maxSim = tmpSim;
-				maxIdx = i;
-			}
+		for (int i = 0; i < filteredLinesIdx.size(); ++i) {
+			//if (getFilteredLine(i) != l) {  
+				double tmpSim = l.getSimilarity(getFilteredLine(i));
+				if (tmpSim > maxSim) {
+					maxSim = tmpSim;
+					maxIdx = i;
+				}
+			//}
 		}
 		return maxIdx;
 	}
 	
-	public void kMeansClustering(int nClusters, int nIterations, Lines centroids, ArrayList<Lines> lineGroups) {
+	public void kMeansClustering(int nClusters, int nIterations, Lines centroidsOrig, ArrayList<Lines> lineGroupsOrig) {
 		
-		nClusters = 40;
-		nIterations = 20;
-		int nLines = allLines.size();
-		
+		//nClusters = 40;
+		//nIterations = 20;
+		int nLines = filteredLinesIdx.size();
 		Random r = new Random();
+		Lines centroids = new Lines();
+		centroids.allLines = this.allLines;
+		centroids.transcripts = this.transcripts;
+		
+		ArrayList<Lines> lineGroups = new ArrayList<Lines>();
 		
 		System.out.println("Beginning K Means Clustering");
 		System.out.println("Initializing clusters");
 		
-		// for each cluster, randomly choose a line and make it the centroid 
-		// possibility of centroid doubles... oh well
-		for (int i = 0; i < nClusters; ++i) {
-			Line l = allLines.get(r.nextInt(nLines));//linesOrder.removeFirst();
-			centroids.addLine(l);
+		// for each cluster, randomly choose a line and make it the centroid
+		// create groups of lines for each cluster
+		ArrayList<Integer> nums = new ArrayList<Integer>();
+		for (int i = 0; i < this.filteredLinesIdx.size(); ++i)
+			nums.add(i);
+		for (int i = 0; i < Math.min(nClusters, nums.size()); ++i) {
+			int randomLineIdx = nums.remove(r.nextInt(nums.size()));
+			Line l = getFilteredLine(randomLineIdx);//linesOrder.removeFirst();
+			
+			//centroids.addLine(l);
+			centroids.addFilteredLineIdx(getFilteredLineIdx(randomLineIdx));
+			
 			Lines lineGroup = new Lines();
-			lineGroup.addLine(l);
+			lineGroup.allLines = this.allLines;
+			// add centroid to the line group (otherwise program could break later)
+			lineGroup.filteredLinesIdx.add(filteredLinesIdx.get(randomLineIdx));
 			lineGroups.add(lineGroup);
 		}
 		
 		// for each line, assign it to the cluster with the most similar centroid
-		for (Line l : allLines) {
+		for (int j = 0; j < filteredLinesIdx.size(); ++j) {
+			Line l = getFilteredLine(j);
 			int maxIdx = centroids.getMaxSimLineIdx(l);
-			lineGroups.get(maxIdx).addLine(l);
+			//lineGroups.get(maxIdx).addLine(l);
+			lineGroups.get(maxIdx).addFilteredLineIdx(getFilteredLineIdx(j));
 		}
 		
-		System.out.print("Iteration: ");
+		int currPercentage = 10;
+		
 		for (int i = 0; i < nIterations; ++i) {
-			System.out.print(i + " ");
 			
-			centroids = new Lines();
+			// clear centroids
+			centroids.removeAllFilteredIdx();
+			
+			// create new line groups
 			ArrayList<Lines> oldLineGroups = lineGroups;
 			lineGroups = new ArrayList<Lines>();
 			
-			// find new centroids;
+			// find new centroids for each of the old line groups;
+			// create line groups for each of the new clusters
 			for (int iGroup = 0; iGroup < oldLineGroups.size(); ++iGroup) {
+				int centroidFilteredIdx = oldLineGroups.get(iGroup).getCentroid();
+				centroids.addFilteredLineIdx(centroidFilteredIdx);
+				//centroids.addLine(centroid);
 				Lines lineGroup = new Lines();
-				Line centroid = oldLineGroups.get(iGroup).getCentroid();
-				centroids.addLine(centroid);
+				lineGroup.allLines = allLines;
+				lineGroup.transcripts = transcripts;
 				lineGroups.add(lineGroup);
 			}
 			
-			// create new groups
-			for (Line l : allLines) {
+			// for each line, assign it to a cluster
+			//System.out.println(i);
+			for (int j = 0; j < filteredLinesIdx.size(); ++j) {
+				//System.out.println(" " + j);
+				Line l = getFilteredLine(j);
 				int maxIdx = centroids.getMaxSimLineIdx(l);
-				lineGroups.get(maxIdx).addLine(l);
+				lineGroups.get(maxIdx).addFilteredLineIdx(getFilteredLineIdx(j));//.filteredLinesIdx.add(filteredLinesIdx.get(j));
 			}
+			
 			
 			// Merge groups that are too small
 			int j = 0;
 			while (j < lineGroups.size()) {
+				if (lineGroups.size() == 1) break;
 				Lines ls = lineGroups.get(j);
-				if (ls.allLines.size() < 4) {
+				if (ls.filteredLinesIdx.size() < 3) {
 					lineGroups.remove(j);
-					centroids.allLines.remove(j);
-					for (Line l : ls.allLines) {
+					centroids.filteredLinesIdx.remove(j);
+					//centroids.allLines.remove(j);
+					//for (Line l : ls.allLines) {
+					for (int k = 0; k < ls.filteredLinesIdx.size(); ++k) {
+						Line l = ls.getFilteredLine(k);
 						int maxIdx = centroids.getMaxSimLineIdx(l);
-						lineGroups.get(maxIdx).addLine(l);
+						// HACK
+						if (maxIdx < lineGroups.size() && maxIdx != -1)
+							lineGroups.get(maxIdx).addFilteredLineIdx(getFilteredLineIdx(k));
 					}
 				} else {
 					++j;
 				}
 			}
+			
+			if (lineGroups.size() == 1) {
+				System.out.println("Too few categories.. breaking.");
+				break;
+			}
+			if (Math.floor(i*100/nIterations) > currPercentage) {
+				System.out.println(currPercentage + "% Iterations Done");
+				currPercentage += 10;
+			}
+		}
+		centroidsOrig.allLines = centroids.allLines;
+		centroidsOrig.filteredLinesIdx = centroids.filteredLinesIdx;
+		for (Lines ls : lineGroups) {
+			lineGroupsOrig.add(ls);
 		}
 	}
 	
@@ -312,7 +402,8 @@ public class Lines {
 		int pruned = 0;
 		for (int filterI = 0; filterI < filteredLinesIdx.size(); ++filterI) {
 			
-			if (allLines.get(filteredLinesIdx.get(filterI)).grammarLine.size() >= minLength) {
+			// don't count punctuation
+			if (allLines.get(filteredLinesIdx.get(filterI)).grammarLine.size() > minLength) {
 				newFilteredLinesIdx.add(filteredLinesIdx.get(filterI));
 			} else {
 				++pruned;
@@ -350,7 +441,7 @@ public class Lines {
 		ArrayList<Integer> newFilteredLinesIdx = new ArrayList<Integer>();
 		int pruned = 0;
 		for (int filterI = 0; filterI < filteredLinesIdx.size(); ++filterI) {
-			if (! allLines.get(filteredLinesIdx.get(filterI)).containsKeyword(word)) {
+			if (! allLines.get(filteredLinesIdx.get(filterI)).containsKeywordSpoken(word)) {
 				newFilteredLinesIdx.add(filteredLinesIdx.get(filterI));
 			} else {
 				++pruned;
@@ -417,6 +508,21 @@ public class Lines {
 		int pruned = 0;
 		for (int filterI = 0; filterI < filteredLinesIdx.size(); ++filterI) {
 			if (! allLines.get(filteredLinesIdx.get(filterI)).containsPattern(pattern)) {
+				newFilteredLinesIdx.add(filteredLinesIdx.get(filterI));
+			} else {
+				++pruned;
+			}
+		}
+		filteredLinesIdx = newFilteredLinesIdx;
+		return pruned;
+	}
+	
+	// very thrown together. this should be merged with pruneByPattern at some point
+	public int pruneByPatternSpoken(ArrayList<String> pattern) {	
+		ArrayList<Integer> newFilteredLinesIdx = new ArrayList<Integer>();
+		int pruned = 0;
+		for (int filterI = 0; filterI < filteredLinesIdx.size(); ++filterI) {
+			if (! allLines.get(filteredLinesIdx.get(filterI)).containsPatternSpoken(pattern)) {
 				newFilteredLinesIdx.add(filteredLinesIdx.get(filterI));
 			} else {
 				++pruned;
@@ -557,6 +663,7 @@ public class Lines {
 		return freq;
 	}
 	
+	// WANT TO MAKE THIS OBSOLETE
 	// return frequencies of all words from filtered lines
 	public Counter<String> filteredFrequencies() {
 		Counter<String> freq = new Counter<String>();
@@ -571,37 +678,49 @@ public class Lines {
 		return freq;
 	}
 	
-	// return nGram frequencies of all words from filtered lines
-	public Counter<ArrayList<String>> filteredNGramFrequencies(int n) {
-		Counter<ArrayList<String>> freq = new Counter<ArrayList<String>>();
-		
-		for (int filterI = 0; filterI < filteredLinesIdx.size(); ++filterI) {
-			Line line = allLines.get(filteredLinesIdx.get(filterI)); 
-			if (line.grammaticalLine != null) {
-				// puncutation is included in these counts
-				for (int i = n-1; i < line.grammaticalLine.size(); ++i) {
-					ArrayList<String> tuple = new ArrayList<String>(n);
-					for (int j = i+1-n; j <= i; ++j)
-						tuple.add(line.grammaticalLine.get(j));
-					freq.incrementCount(tuple, 1.0);
-				}	
-			}
+	
+	
+	public Counter<String> filteredStrNGramFrequencies(int n) {
+		Counter<ArrayList<String>> nGramFreq = filteredNGramFrequencies(n);
+		Counter<String> strNGramFreq  = new Counter<String>();
+		for (ArrayList<String> key : nGramFreq.keySet()) {
+			strNGramFreq.incrementCount(key.toString(), nGramFreq.getCount(key));
 		}
-		return freq;
+		return strNGramFreq;
 	}
 	
+	
+	public Counter<ArrayList<String>> tfidfNGramWeights(int n) {
+		Counter<ArrayList<String>> filteredNGramFreq = filteredNGramFrequencies(n);
+		Counter<ArrayList<String>> allNGramFreq = allNGramFrequencies(n);
+		Counter<ArrayList<String>> weights = new Counter<ArrayList<String>>();
+		double filteredNGramTotal = filteredNGramFreq.totalCount();
+		double allNGramTotal = allNGramFreq.totalCount();
+		double allLinesTotal = allLines.size();
+		for (ArrayList<String> nGram : filteredNGramFreq.keySet()) {
+			Lines copy = this.copy();
+			// tf = (# times term occurs in filtered lines) / (total count of terms in filtered lines)
+			// idf = log( (# lines all) / (# lines containing the term) )  
+			weights.incrementCount(nGram, (filteredNGramFreq.getCount(nGram)/filteredNGramTotal)*Math.log(allLinesTotal/allNGramFreq.getCount(nGram)));
+		}
+		return weights;
+	}
+	// return nGram frequencies of all words from filtered lines
+	public Counter<ArrayList<String>> filteredNGramFrequencies(int n) {
+		return getFilteredLines().allNGramFrequencies(n);
+	}
+	
+	// NOT OBSOLETE
 	public Counter<ArrayList<String>> allNGramFrequencies(int n) {
 		Counter<ArrayList<String>> freq = new Counter<ArrayList<String>>();
-		
 		for (Line line : allLines) {
-			if (line.grammaticalLine != null) {
-				// puncutation is included in these counts
-				for (int i = n-1; i < line.grammaticalLine.size(); ++i) {
-					ArrayList<String> tuple = new ArrayList<String>(n);
-					for (int j = i+1-n; j <= i; ++j)
-						tuple.add(line.grammaticalLine.get(j));
-					freq.incrementCount(tuple, 1.0);
-				}	
+			// puncutation is included in these counts
+			for (int i = 0; i < line.spokenLine2.size()-n; ++i) {
+				ArrayList<String> tmp = new ArrayList<String>(n);
+				for (int j = i; j < i+n; ++j) {
+					tmp.add(line.spokenLine2.get(j));
+				}
+				freq.incrementCount(tmp, 1.0);
 			}
 		}
 		return freq;
@@ -643,23 +762,6 @@ public class Lines {
 		}
 		return freq;
 	}
-	
-	/*public Counter<ArrayList<String>> allNGramLineFrequencies(int n) {
-		Counter<ArrayList<String>> freq = new Counter<ArrayList<String>>();
-		
-		for (Line line : allLines) {
-			if (line.grammaticalLine != null) {
-				// puncutation is included in these counts
-				for (int i = n-1; i < line.grammaticalLine.size(); ++i) {
-					ArrayList<String> tuple = new ArrayList<String>(n);
-					for (int j = i+1-n; j <= i; ++j)
-						tuple.add(line.grammaticalLine.get(j));
-					freq.incrementCount(tuple, 1.0);
-				}	
-			}
-		}
-		return freq;
-	}*/
 	
 	
 	// return frequencies of words of the POS from filtered lines
@@ -719,36 +821,7 @@ public class Lines {
 		}
 		return freq;
 	}
-	// return frequencies of bigrams from all lines (unfiltered)
-	public Counter<String> bigramFrequency() {
-		Counter<String> freq = new Counter<String>();
-		for (int filterI = 0; filterI < filteredLinesIdx.size(); ++filterI) {
-			Line line = allLines.get(filteredLinesIdx.get(filterI));
-			// ignore punctuation mark at the end
-			if (line.grammaticalLine != null) {
-				for (int i = 1; i < line.grammaticalLine.size()-1; ++i) {
-					freq.incrementCount(line.grammaticalLine.get(i-1) + " " + line.grammaticalLine.get(i), 1.0);
-				}	
-			}
-		}
-		return freq;
-	}
 	
-	// return frequencies of bigrams from filtered lines
-	public Counter<String> filteredBigramFrequency() {
-		Counter<String> freq = new Counter<String>();
-		
-		for (int filterI = 0; filterI < filteredLinesIdx.size(); ++filterI) {
-			Line line = allLines.get(filteredLinesIdx.get(filterI)); 
-			if (line.grammaticalLine != null) {
-				// ignore punctuation mark at the end
-				for (int i = 1; i < line.grammaticalLine.size()-1; ++i) {
-					freq.incrementCount(line.grammaticalLine.get(i-1) + " " + line.grammaticalLine.get(i), 1.0);
-				}	
-			}
-		}
-		return freq;
-	}
 	
 	public Lines getFilteredLines() {
 		ArrayList<Line> lines = new ArrayList<Line>();
@@ -757,7 +830,34 @@ public class Lines {
 		return new Lines(lines, transcripts);
 	}
 	
+	public ArrayList<Line> getFilteredLinesArr() {
+		ArrayList<Line> lines = new ArrayList<Line>(filteredLinesIdx.size());
+		for (Iterator<Integer> it = filteredLinesIdx.iterator(); it.hasNext(); )
+			lines.add(allLines.get(it.next()));
+		return lines;
+	}
 	
+	
+	// if the speaker is CHI, find num lines until another person talks
+	// if the speaker is not CHI, find num lines until the CHI talks
+	public int findNumLinesUntilOtherSpeaker(int idxFromAllLines, String speaker) {
+		boolean findChild = false;
+		if (! speaker.equals("CHI"))
+			findChild = true;
+		Line l = allLines.get(idxFromAllLines);
+		int transcriptID = l.transcriptId;
+		
+		int count = 1;
+		for (int i = idxFromAllLines+1; i < allLines.size(); ++i) {
+			l = allLines.get(i);
+			if (l.transcriptId != transcriptID)
+				break;
+			if ((findChild && l.participant.equals("CHI")) || (! findChild && ! l.participant.equals("CHI")))
+				return count;
+			++count;
+		}
+		return -1;
+	}
 	public ArrayList<Line> getKWAL(int nBefore, int nAfter, int lineIdx) {
 		//ArrayList<Lines> lineGroups = new ArrayList<Lines>();
 		
@@ -1042,6 +1142,76 @@ public class Lines {
 		}	
 		return lineGroups;
 	
-}
+	}
+	
+	
+
+	// create mapping from lineIDs to filteredLineIdx
+	// O(n^2) time
+	public HashMap<Integer, Integer> getLineIDToAllLineIdxMapping(ArrayList<Integer> lineIDs) {
+		HashMap<Integer, Integer> mapping = new HashMap<Integer, Integer> (); 
+		for (int lineID : lineIDs) {
+			for (int allLineIdx = 0; allLineIdx < this.totalLines(); ++allLineIdx) {
+				if (lineID == allLines.get(allLineIdx).ID) {
+					mapping.put(lineID, allLineIdx);
+				}
+			}
+		}
+		return mapping;
+	}
+	
+	public HashMap<Integer, Integer> getLineIDToFilteredLineIdxMapping(ArrayList<Integer> lineIDs) {
+		HashMap<Integer, Integer> mapping = new HashMap<Integer, Integer> (); 
+		for (int lineID : lineIDs) {
+			int currFilteredLineIdx;
+			for (currFilteredLineIdx = 0; currFilteredLineIdx < this.filteredLinesIdx.size(); ++currFilteredLineIdx) {
+				
+				if (lineID == getFilteredLine(currFilteredLineIdx).ID) {
+					mapping.put(lineID, currFilteredLineIdx);
+				//	currFilteredLineIdx = filteredLinesIdx.size();
+					break;
+				}
+				
+			}
+			if (currFilteredLineIdx == filteredLinesIdx.size()) {
+				// ERROR
+				int x = 0;
+				x = 1;
+			
+			}
+			
+		}
+		return mapping;
+	}
+	
+	public void removeAllLineFeatures() {
+		for (Line l : allLines)
+			l.features = new Counter<String>();
+	}
+	public void removeAllFilteredIdx() {
+		filteredLinesIdx = new ArrayList<Integer>();
+	}
+	
+	public String toString() {
+		StringBuffer s = new StringBuffer();
+		for (int i = 0 ; i < filteredLinesIdx.size(); ++i)
+			s.append(getFilteredLine(i));
+		return s.toString();
+	}
+	
+	public HashMap<Integer, Integer> getAllLinesIDtoLineIDMap() {
+		HashMap<Integer, Integer> map = new HashMap<Integer, Integer>();
+		for (int i = 0; i < allLines.size(); ++i) {
+			map.put(i, getLineFromAll(i).ID);
+		}
+		return map;
+	}
+	public HashMap<Integer, Integer> getLineIDtoAllLinesIDMap() {
+		HashMap<Integer, Integer> map = new HashMap<Integer, Integer>();
+		for (int i = 0; i < allLines.size(); ++i) {
+			map.put(getLineFromAll(i).ID,i);
+		}
+		return map;
+	}
 	
 }
