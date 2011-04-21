@@ -24,7 +24,7 @@ public class RegexFinder {
 	public static void main(String[] args) {
 		String dirRoot = "/home/pomegranate/frosting/QA/childes/";
 		String outputDir = "./";
-		String dirStr = "Brown/Adam Brown/Sarah Kuczaj MacWhinney Sachs Suppes Warren";//"Brown/Sarah";//"Kuczaj";//"Brown/Sarah";// Brown/Sarah Kuczaj MacWhinney Sachs Suppes Warren";
+		String dirStr = "Brown/Adam";//"Brown/Adam Brown/Sarah Kuczaj MacWhinney Sachs Suppes Warren";//"Brown/Sarah";//"Kuczaj";//"Brown/Sarah";// Brown/Sarah Kuczaj MacWhinney Sachs Suppes Warren";
 		
 		String[] directories; 
 		
@@ -134,7 +134,7 @@ public class RegexFinder {
 			//}
 			Lines linesSubset = new Lines(copy.getFilteredLinesArr(), lines.transcripts);
 			
-			int nClusters = 40, nIterations = 500;
+			int nClusters = 40, nIterations = 20;
 			Lines centroids = new Lines();
 			centroids.allLines = copy.allLines;
 			centroids.transcripts = copy.transcripts;
@@ -143,7 +143,7 @@ public class RegexFinder {
 			//linesSubset.kMeansClustering(nClusters, nIterations, centroids, lineGroups);
 			System.out.println();
 			
-			AnalyzeMerged.printSentenceClusters(lineGroups, centroids, i + word + "_clusters.txt", copy);
+			AnalyzeMerged.printSentenceClusters(lineGroups, centroids, i + word + "_clusters.txt", copy, true);
 		 }
 		 
 		 

@@ -6,6 +6,7 @@ package qa.childes.transcripts.print;
  */
 import java.io.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import qa.util.*;
@@ -189,7 +190,7 @@ public class AnalyzeMerged {
 		Counter<String> freqFilteredLines = lines.filteredTranscriptFrequencies();
 		Counter<String> freqNounFilteredLines = lines.filteredTranscriptFrequenciesPOS("n");
 		Counter<String> freqVerbFilteredLines = lines.filteredTranscriptFrequenciesPOS("v");
-		//Counter<String> biFreqFilteredLines = lines.filteredBigramFrequency();
+		Counter<String> biFreqFilteredLines = lines.filteredStrNGramFrequencies(2);
 		int total = (int)freqFilteredLines.totalCount();
 		PriorityQueue<String> wordOrder = new FastPriorityQueue<String>(freqFilteredLines);
 		PriorityQueue<String> wordVOrder = new FastPriorityQueue<String>(freqVerbFilteredLines);
@@ -495,21 +496,45 @@ public class AnalyzeMerged {
 	 * @param centroids : Lines object of centroids
 	 * @param outputName : output file name
 	 */
-	public static void printSentenceClusters(ArrayList<Lines> allLines, Lines centroids, String outputName) {
+	public static void printSentenceClusters(ArrayList<Lines> allLines, Lines centroids, String outputName, Lines origLines, boolean withResponse) {
 		FileOutputStream out; // declare a file output object
 		PrintStream p; // declare a print stream object
+		ArrayList<Integer> lineIDs = new ArrayList<Integer>();
+		for (Line l : origLines.getFilteredLinesArr())
+			lineIDs.add(l.ID);
+		//HashMap<Integer, Integer> mappingLineIDsTo = origLines.getLineIDToFilteredLineIdxMapping(lineIDs);
+		HashMap<Integer, Integer> lineIDtoallLinesID = origLines.getLineIDtoAllLinesIDMap();
 		try {
 			out = new FileOutputStream(outputName);
 			// Connect print stream to the output stream	
 			p = new PrintStream( out );
 
-			for (int i = 0; i < allLines.size(); ++i) {
+			for (int i = 0; i < centroids.filteredLinesIdx.size(); ++i) {
 				p.println("===Centroid " + i + "===");
-				p.println(centroids.allLines.get(i).spokenLineStr);
+				p.println(centroids.getFilteredLine(i).spokenLineStr);
 				p.println("===============");
-				for (int j = 0; j < allLines.get(i).allLines.size(); ++j)
-					p.println(allLines.get(i).allLines.get(j));
-				p.println();
+				for (int j = 0; j < allLines.get(i).filteredLinesIdx.size(); ++j) {
+					int lineID = allLines.get(i).getFilteredLine(j).ID;
+					
+					Line filteredLine = allLines.get(i).getFilteredLine(j);
+					//int nextLineID = filteredLine.ID + 1;
+					//if (lineIDtoallLinesID.containsKey(nextLineID)) {
+					p.println(lineID + "\t" + filteredLine); // for cluster i, get the filtered line indexed at j
+					if (withResponse) {
+						int allLinesID = lineIDtoallLinesID.get(lineID);
+						int numLinesToResponse = origLines.findNumLinesUntilOtherSpeaker(allLinesID, "CHI");
+						if (numLinesToResponse != -1) {
+							ArrayList<Line> linesKWAL = origLines.getKWAL(0, numLinesToResponse, allLinesID);
+							for (Line l : linesKWAL)
+								p.println("\t" + l.ID + "\t" + l);
+						}
+					}
+						//p.println("\t" + lineID + "\t" + origLines.getLineFromAll(allLinesID));
+					//}
+					
+					//p.println("\t" + allLines.get(i).getLineFromAll(allLines.get(i).getFilteredLineIdx(j)+1));
+					//p.println("   " + origLines.getFilteredLine(mappingLineIDsTo.get(lineID)+1).spokenLineStr);
+				} p.println();
 				
 			}
 			p.close();
