@@ -3,10 +3,14 @@ package qa.childes.transcripts.parser;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import qa.nlp.ExpandContractions;
 import qa.util.*;
+import danbikel.wordnet.Morphy;
+import danbikel.wordnet.WordNet;
 
 
 public class Line {
+
 	
 	public String[] spokenLine;
 	ArrayList<String> spokenLine2;
@@ -19,7 +23,12 @@ public class Line {
 	public int ID = 0;
 	public int transcriptId;
 	
+	public ArrayList<String> stemmedSpokenLine;
+	boolean stemmed = false;
 	
+	public Line(ArrayList<String> lines, int transcriptId, int lineId) {
+		this(lines, transcriptId, lineId, null, null);
+	}
 	/** constructor for a Line object
 	 * 
 	 * @param lines : ArrayList<String>. 
@@ -27,7 +36,7 @@ public class Line {
 	 * 					subsequent Strings should be descriptors of the line (mor, etc.)
 	 * @param transcriptId : int. a unique numerical ID for the Line  
 	 */
-	public Line(ArrayList<String> lines, int transcriptId, int lineId) {
+	public Line(ArrayList<String> lines, int transcriptId, int lineId, Morphy m, WordNet wn) {
 		ID = lineId;
 		
 		grammarLine = new ArrayList<String>(0);
@@ -64,9 +73,64 @@ public class Line {
 			}
 		}
 		spokenLine2 = strArrayToArrayList(spokenLine);
+		if (m == null) {
+			stemmedSpokenLine = spokenLine2;
+		} else {
+			stemmed = true;
+		stemmedSpokenLine = stemSpokenLine(spokenLine2, m, wn, new HashMap<String, ArrayList<String>>());
+		}
+		
 		features = new Counter<String>();
 	}
 	
+	public void setStemmedLine(Morphy m, WordNet wn, HashMap<String, ArrayList<String>> memoized) {
+		stemmedSpokenLine = stemSpokenLine(spokenLine2, m, wn, memoized);
+	}
+	
+	public ArrayList<String> stemSpokenLine(ArrayList<String> spokenLine, Morphy m, WordNet wn, HashMap<String, ArrayList<String>> memoized) {
+	
+		ExpandContractions ex = new ExpandContractions(); // should be passed in...
+		ArrayList<String> stemmedLine = new ArrayList<String>();
+		for (String s : spokenLine) {
+			if (memoized.containsKey(s))
+				for (String ms : memoized.get(s))
+					stemmedLine.add(ms);
+			else {
+				ArrayList<String> sToAdd = new ArrayList<String>();
+				if (s.indexOf('\'') != -1) {
+					String expandedStr = ex.getExpanded(s);
+					if (expandedStr.equals(s)) {
+						sToAdd.add(s);
+						//stemmedLine.add(s);
+					} else {
+						String[] expandedParts = expandedStr.split(" ");
+						for (String es : expandedParts) {
+							String[] tryVerbMorph = m.morphStr(es, wn.verbPos);
+							if (tryVerbMorph.length != 0)
+								sToAdd.add(tryVerbMorph[0]);//stemmedLine.add(tryVerbMorph[0]);
+							else 
+								sToAdd.add(es);//stemmedLine.add(es);		
+						}
+					}
+				} else {
+					String[] tryVerbMorph = m.morphStr(s, wn.verbPos);
+					if (tryVerbMorph.length != 0)
+						sToAdd.add(tryVerbMorph[0]);//stemmedLine.add(tryVerbMorph[0]);
+					else {
+						String[] tryNounMorph = m.morphStr(s, wn.nounPos);
+						if (tryNounMorph.length != 0)
+							sToAdd.add(tryNounMorph[0]);//stemmedLine.add(tryNounMorph[0]);
+						else 
+							sToAdd.add(s);//stemmedLine.add(s);
+					}
+				}
+				for (String sa : sToAdd)
+					stemmedLine.add(sa);
+				memoized.put(s, sToAdd);
+			}
+		}
+		return stemmedLine;
+	}
 	/**
 	 * correct translations such as dis [: this]
 	 * 
@@ -477,11 +541,11 @@ public class Line {
 		Counter<String> features = new Counter<String>();
 		// add unigram features
 		//if (grammaticalLine != null)
-		ArrayList<String> line;
-		if (grammaticalLine == null)
-			line = strArrayToArrayList(spokenLine);
-		else
-			line = grammaticalLine;
+		ArrayList<String> line = stemmedSpokenLine;
+		//if (grammaticalLine == null)
+		//	line = strArrayToArrayList(spokenLine);
+		//else
+		//	line = grammaticalLine;
 		
 		for (String unigram : line)
 			if (commonWords.containsKey(unigram))
@@ -510,6 +574,23 @@ public class Line {
 	
 	public void setFeatures(Counter<String> commonWords) {
 		features = extractFeatures(commonWords);
+	}
+	
+	public void initializedFeatures() {
+		features = new Counter();
+	}
+	public void setTFIDFFeatures(Counter<String> tfidfUnigrams, Counter<String> stopWords) {
+		for (String s : stemmedSpokenLine) 
+			if (! stopWords.containsKey(s) && tfidfUnigrams.containsKey(s)) {
+				features.incrementCount(s, tfidfUnigrams.getCount(s));
+			}
+	}
+	public void setTFIDFResponseFeatures(Counter<String> tfidfResponses, Counter<String> stopWords, Line response, double weight) {
+		for (String s : response.stemmedSpokenLine) {
+			if (! stopWords.containsKey(s) && tfidfResponses.containsKey(s)) {
+				features.incrementCount(s + "_response", tfidfResponses.getCount(s) * weight);
+			}
+		}
 	}
 
 	public String toString() {

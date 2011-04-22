@@ -97,14 +97,21 @@ public class Transcript {
 	        	if (equalIdx != 0) {	// if there is a line number, then it is a spoken line
 	        		spokenLineIdx = spokenLineIdxNew;
 	        		spokenLineIdxNew = Integer.parseInt(line.substring(0,equalIdx));
+	        			
 	        	}
 	        	line = line.substring(startIdx);
 	        	
 	        	if (workingLine.equals("@End")) break;
 	        	
+	        	
+	        	// ADD FIX
+	        	if (line.charAt(0) == '*') {
+	        		
+	        		allLines.add(new Line(lines, transcriptId, spokenLineIdx));
+	        	}
 	        	if (line.charAt(0) != '\t') { // if this line is not extending the previous line, we need to add the previous working line
 	        		if ( workingLine.charAt(0) == '*') {	// if the workingLine is a spoken line
-		        		allLines.add(new Line(lines, transcriptId, spokenLineIdx));
+		        		//allLines.add(new Line(lines, transcriptId, spokenLineIdx));
 		        		lines = new ArrayList<String>();
 		        		lines.add(workingLine);
 		        	} else {

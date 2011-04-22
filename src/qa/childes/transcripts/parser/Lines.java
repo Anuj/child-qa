@@ -6,6 +6,9 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.*;
 
+import danbikel.wordnet.Morphy;
+import danbikel.wordnet.WordNet;
+
 import qa.util.*;
 public class Lines {
 
@@ -542,6 +545,16 @@ public class Lines {
 		}
 		filteredLinesIdx = newFilteredLinesIdx;
 	}
+	
+	public void keepOnlyNotPerson(String person) {
+		ArrayList<Integer> newFilteredLinesIdx = new ArrayList<Integer>();
+		for (int filterI = 0; filterI < filteredLinesIdx.size(); ++filterI) {
+			if (! allLines.get(filteredLinesIdx.get(filterI)).participant.equals(person)) {
+				newFilteredLinesIdx.add(filteredLinesIdx.get(filterI));
+			}
+		}
+		filteredLinesIdx = newFilteredLinesIdx;
+	}
 
 	// keep only lines that contain the pos
 	public void keeyOnlyLinesWithPOS(String pos) {
@@ -655,8 +668,8 @@ public class Lines {
 	public Counter<String> frequencies() {
 		Counter<String> freq = new Counter<String>();
 		for (Line line : allLines) {
-			if (line.grammaticalLine != null) {
-				for (String word : line.grammaticalLine)
+			if (line.stemmedSpokenLine != null) {
+				for (String word : line.stemmedSpokenLine)
 				freq.incrementCount(word, 1.0);
 			}
 		}
@@ -715,10 +728,10 @@ public class Lines {
 		Counter<ArrayList<String>> freq = new Counter<ArrayList<String>>();
 		for (Line line : allLines) {
 			// puncutation is included in these counts
-			for (int i = 0; i < line.spokenLine2.size()-n; ++i) {
+			for (int i = 0; i < line.stemmedSpokenLine.size()-n; ++i) {
 				ArrayList<String> tmp = new ArrayList<String>(n);
 				for (int j = i; j < i+n; ++j) {
-					tmp.add(line.spokenLine2.get(j));
+					tmp.add(line.stemmedSpokenLine.get(j));
 				}
 				freq.incrementCount(tmp, 1.0);
 			}
@@ -825,8 +838,10 @@ public class Lines {
 	
 	public Lines getFilteredLines() {
 		ArrayList<Line> lines = new ArrayList<Line>();
-		for (Iterator<Integer> it = filteredLinesIdx.iterator(); it.hasNext(); )
-			lines.add(allLines.get(it.next()));
+		//for (Iterator<Integer> it = filteredLinesIdx.iterator(); it.hasNext(); )
+		//	lines.add(allLines.get(it.next()));
+		for (int i = 0; i < filteredLinesIdx.size(); ++i)
+			lines.add(getFilteredLine(i));
 		return new Lines(lines, transcripts);
 	}
 	
@@ -1184,6 +1199,11 @@ public class Lines {
 		return mapping;
 	}
 	
+	public void setStemmedLines(Morphy m, WordNet wn, HashMap<String, ArrayList<String>> memoized) {
+		for (Line l : allLines) {
+			l.setStemmedLine(m, wn, memoized);
+		}
+	}
 	public void removeAllLineFeatures() {
 		for (Line l : allLines)
 			l.features = new Counter<String>();
@@ -1198,7 +1218,11 @@ public class Lines {
 			s.append(getFilteredLine(i));
 		return s.toString();
 	}
-	
+
+	public void setMaps() {
+		lineIDtoAllLinesIDMap = getLineIDtoAllLinesIDMap();
+		allLinesIDtoLineIDMap = getAllLinesIDtoLineIDMap();
+	}
 	public HashMap<Integer, Integer> getAllLinesIDtoLineIDMap() {
 		HashMap<Integer, Integer> map = new HashMap<Integer, Integer>();
 		for (int i = 0; i < allLines.size(); ++i) {
