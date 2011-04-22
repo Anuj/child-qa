@@ -267,24 +267,14 @@ public class AnalyzeMerged {
 			System.err.println ("Error writing to file");
 		}
 	}
-	
-	/**
-	 * prints a text file of clusters of lines. 
-	 * each cluster includes a line of interest and a certain number of lines before and after the line of interest.
-	 * the clusters are separated by the text file from which they come from
-	 *   
-	 * @param outputName : output file name
-	 * @param filteredLines : an ArrayList of Lines. Each Lines object contains a cluster of lines (lines before and after a line of interest)
-	 * @param allLines : all lines
-	 */
-	public static void printLines(String outputName, ArrayList<Lines> filteredLines, Lines allLines) {
-		
+
+	public static void printFilteredLines(String outputName, Lines allLines, String notes, boolean withResponse) {
 		FileOutputStream out; // declare a file output object
 		PrintStream p; // declare a print stream object
 		//ArrayList<String> keywordLines = lines.allLines; 
 		int totalLines = allLines.totalLines();//allLines.allLines.size();
 		
-		int totalFilteredLines = filteredLines.size();
+		int totalFilteredLines = allLines.filteredLinesIdx.size();
 		
 		try
 		{
@@ -294,32 +284,51 @@ public class AnalyzeMerged {
 			// Connect print stream to the output stream	
 			p = new PrintStream( out );
 			
+			p.println(notes);
 			p.println("Total Lines: " + totalLines);
 			p.println("Total Filtered Lines: " + totalFilteredLines);
 			
+			//p.println("Total Random Lines Printed: " + k);
+			
 			int transcriptID = -1;
-			for (Lines lines : filteredLines) {
-				Transcript t = lines.transcripts.get(0); 
-				if (t.transcriptID != transcriptID) {
+			HashMap<Integer, Integer> lineIDtoallLinesID = allLines.lineIDtoAllLinesIDMap;
+			for (int idxTmp = 0; idxTmp < allLines.filteredLinesIdx.size(); ++idxTmp) {
+				
+				Line filteredLine = allLines.getFilteredLine(idxTmp);
+				int lineID = filteredLine.ID;
+				//Lines lines = filteredLines.get(idxTmp);
+				int transcriptIDTmp = filteredLine.transcriptId;//allLines.transcripts.get(allLines.getLine(idxTmp).transcriptId); 
+				if (transcriptIDTmp != transcriptID) {
 					p.println("============");
+					Transcript t = allLines.transcripts.get(transcriptIDTmp); 
 					p.println(t.path);
 					if (t.fileProperties.containsKey("situation"))
 						p.println(t.fileProperties.get("situation"));
 					p.println("============");
-					transcriptID = t.transcriptID;
+					transcriptID = transcriptIDTmp;
 				}
-				for (Line line : lines.allLines) 
-					p.println(line.spokenLineStr);
-				p.println();
+				
+				p.println(lineID + "\t" + filteredLine); // for cluster i, get the filtered line indexed at j
+				if (withResponse) {
+					int allLinesID = lineIDtoallLinesID.get(lineID);
+					int numLinesToResponse = allLines.findNumLinesUntilOtherSpeaker(allLinesID, "CHI");
+					if (numLinesToResponse != -1) {
+						ArrayList<Line> linesKWAL = allLines.getKWAL(0, numLinesToResponse, allLinesID);
+						linesKWAL.remove(9);
+						for (Line l : linesKWAL)
+							p.println("\t" + l.ID + "\t" + l);
+					}
+				}
+				
+				//p.println();
 			}
 			p.close();
 		}
 		catch (Exception e)
 		{
-			System.err.println ("Error writing to file");
+			System.err.println ("Error writing to file\n" + e);
 		}
 	}
-	
 	
 	/**
 	 * prints a text file of k randomly selected clusters of lines. 
@@ -462,7 +471,7 @@ public class AnalyzeMerged {
 	 * @param total : total number of unique words
 	 */
 	// 
-	public static void printFrequencies(String outputName, PriorityQueue<String> freq, int total) {
+	public static void printFrequencies(String outputName, PriorityQueue<String> freq, double total) {
 		
 		FileOutputStream out; // declare a file output object
 		PrintStream p; // declare a print stream object
@@ -480,7 +489,7 @@ public class AnalyzeMerged {
 			p.println("Total Distinct Words: " + freq.size());
 			while (! freq.isEmpty()) {
 				double count = freq.getPriority();
-				p.println(freq.removeFirst() + '\t' + (int)count);
+				p.println(freq.removeFirst() + '\t' + count);
 			}
 			p.close();
 		}
